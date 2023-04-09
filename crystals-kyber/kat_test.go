@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-//helpers (see NIST's PQCgenKAT.c)
+// helpers (see NIST's PQCgenKAT.c)
 type randomBytes struct {
 	key [32]byte
 	v   [16]byte
@@ -167,7 +167,10 @@ func testKAT(t *testing.T, k *Kyber) {
 				g2.randombytes(kseed[32:])
 				g2.randombytes(eseed)
 
-				opk, osk = k.KeyGen(kseed[:])
+				opk, osk, err = k.KeyGen(kseed[:])
+				if err != nil {
+					t.Fatal("Unable to generate keys")
+				}
 			}
 		case "sk":
 			if len(hval) != k.params.SIZESK {
@@ -189,11 +192,15 @@ func testKAT(t *testing.T, k *Kyber) {
 			if len(hval) != smlen {
 				t.Fatal("smlen != len(sm)")
 			}
-			ct, ss := k.Encaps(eseed, pk)
-			if !bytes.Equal(ss, hval) {
+			ct, ss, err := k.Encaps(eseed, pk)
+			if !bytes.Equal(ss, hval) || err != nil {
 				t.Fatal("signed data mismatch")
 			}
-			if !bytes.Equal(k.Decaps(ct, sk), ss) {
+			dcap, err := k.Decaps(ct, sk)
+			if err != nil {
+				t.Fatal("failed to validate")
+			}
+			if !bytes.Equal(dcap, ss) {
 				t.Fatal("failed to validate")
 			}
 		}

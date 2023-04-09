@@ -24,26 +24,32 @@ func TestKEMSuite(t *testing.T) {
 func testKeyGenKEMRep(t *testing.T, k *Kyber) {
 	seed := make([]byte, 64)
 	rand.Read(seed)
-	pk, sk := k.KeyGen(seed)
-	pk2, sk2 := k.KeyGen(seed)
+	pk, sk, err := k.KeyGen(seed)
+	if err != nil {
+		t.Fatal("Seed in keygen failed")
+	}
+	pk2, sk2, err := k.KeyGen(seed)
 	if !bytes.Equal(pk[:], pk2[:]) || !bytes.Equal(sk[:], sk2[:]) {
 		t.Fatalf("Seed in keygen failed")
 	}
 	var r [32]byte
 	rand.Read(r[:])
-	c, ss := k.Encaps(pk, r[:])
-	c2, ss2 := k.Encaps(pk, r[:])
+	c, ss, err := k.Encaps(pk, r[:])
+	c2, ss2, err := k.Encaps(pk, r[:])
 	if !bytes.Equal(c2, c) || !bytes.Equal(ss, ss2) {
 		t.Fatalf("Seed in keygen failed")
 	}
 }
 
 func testDecaps(t *testing.T, k *Kyber) {
-	pk, sk := k.KeyGen(nil)
+	pk, sk, err := k.KeyGen(nil)
+	if err != nil {
+		t.Fatal("Failed to decaps")
+	}
 	var r [32]byte
 	rand.Read(r[:])
-	c, ss := k.Encaps(pk, r[:])
-	ss2 := k.Decaps(sk, c)
+	c, ss, err := k.Encaps(pk, r[:])
+	ss2, err := k.Decaps(sk, c)
 	if !bytes.Equal(ss[:], ss2[:]) {
 		fmt.Printf("k %+v vs k2 %+v\n", ss, ss2)
 		t.Fatal("Failed to decaps")
@@ -51,11 +57,14 @@ func testDecaps(t *testing.T, k *Kyber) {
 }
 
 func testBadSize(t *testing.T, k *Kyber) {
-	c, _ := k.Encaps(nil, nil)
+	c, _, err := k.Encaps(nil, nil)
+	if err != nil {
+		t.Fatal("Encaps should nto work with empty key.")
+	}
 	if c != nil {
 		t.Fatal("Encaps should not work with empty key.")
 	}
-	ss := k.Decaps(nil, nil)
+	ss, err := k.Decaps(nil, nil)
 	if ss != nil {
 		t.Fatal("Decaps should not work with empty inputs.")
 	}

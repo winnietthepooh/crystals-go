@@ -21,46 +21,46 @@ var zetas = [128]int16{
 
 var f = int16(1441)
 
-//NTT performs in place forward NTT
+// NTT performs in place forward NTT
 func (p *Poly) ntt() {
-	var len, start, j, k uint
+	var length, start, j, k uint
 	var zeta, t int16
 
 	k = 1
-	for len = 128; len > 1; len >>= 1 {
-		for start = 0; start < n; start = j + len {
+	for length = 128; length > 1; length >>= 1 {
+		for start = 0; start < n; start = j + length {
 			zeta = zetas[k]
 			k++
-			for j = start; j < start+len; j++ {
-				t = fqmul(zeta, p[j+len])
-				p[j+len] = p[j] - t
+			for j = start; j < start+length; j++ {
+				t = fqMul(zeta, p[j+length])
+				p[j+length] = p[j] - t
 				p[j] = p[j] + t
 			}
 		}
 	}
 }
 
-//InvNTT perfors in place backward NTT and multiplication by Montgomery factor 2^32.
-func (p *Poly) invntt() {
-	var len, start, j, k uint
+// InvNTT performs in place backward NTT and multiplication by Montgomery factor 2^32.
+func (p *Poly) invNTT() {
+	var length, start, j, k uint
 	var zeta, t int16
 
 	k = 127
-	for len = 2; len < n; len <<= 1 {
-		for start = 0; start < n; start = j + len {
+	for length = 2; length < n; length <<= 1 {
+		for start = 0; start < n; start = j + length {
 			zeta = zetas[k]
 			k--
-			for j = start; j < start+len; j++ {
+			for j = start; j < start+length; j++ {
 				t = p[j]
-				p[j] = barretReduce(t + p[j+len])
-				p[j+len] = p[j+len] - t
-				p[j+len] = fqmul(zeta, p[j+len])
+				p[j] = barretReduce(t + p[j+length])
+				p[j+length] = p[j+length] - t
+				p[j+length] = fqMul(zeta, p[j+length])
 			}
 		}
 	}
 
 	for j = 0; j < n; j++ {
-		p[j] = fqmul(f, p[j])
+		p[j] = fqMul(f, p[j])
 	}
 }
 
@@ -70,7 +70,7 @@ func (v Vec) ntt(K int) {
 	}
 }
 
-//Computes the integer in {-(q-1)/2,...,(q-1)/2} congruent to a modulo q
+// Computes the integer in {-(q-1)/2,...,(q-1)/2} congruent to a modulo q
 func barretReduce(a int16) int16 {
 	v := int16(((uint32(1) << 26) + uint32(q/2)) / uint32(q))
 
@@ -80,7 +80,7 @@ func barretReduce(a int16) int16 {
 	return a - t
 }
 
-//Computes the integer in {-q+1,...,q-1} congruent to a * R^-1 modulo q
+// Computes the integer in {-q+1,...,q-1} congruent to a * R^-1 modulo q
 func montgomeryReduce(a int32) int16 {
 	u := int16(a * int32(qInv))
 	t := int32(u) * int32(q)
@@ -96,18 +96,18 @@ func (p *Poly) fromMont() {
 	}
 }
 
-//Multiplication folowed by Montgomery reduction
-func fqmul(a, b int16) int16 {
+// Multiplication followed by Montgomery reduction
+func fqMul(a, b int16) int16 {
 	return montgomeryReduce(int32(a) * int32(b))
 }
 
-//Multiplication of elements in Rq in NTT domain
-func basemul(a, b []int16, zeta int16) []int16 {
+// Multiplication of elements in Rq in NTT domain
+func baseMul(a, b []int16, zeta int16) []int16 {
 	r := make([]int16, 2)
-	r[0] = fqmul(a[1], b[1])
-	r[0] = fqmul(r[0], zeta)
-	r[0] += fqmul(a[0], b[0])
-	r[1] = fqmul(a[0], b[1])
-	r[1] += fqmul(a[1], b[0])
+	r[0] = fqMul(a[1], b[1])
+	r[0] = fqMul(r[0], zeta)
+	r[0] += fqMul(a[0], b[0])
+	r[1] = fqMul(a[0], b[1])
+	r[1] += fqMul(a[1], b[0])
 	return r
 }

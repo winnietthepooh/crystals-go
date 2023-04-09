@@ -39,8 +39,14 @@ func testKeyGenRep(t *testing.T, k *Kyber) {
 	var r, msg [32]byte
 	rand.Read(r[:])
 	rand.Read(msg[:])
-	c := k.Encrypt(pk, msg[:], r[:])
-	c2 := k.Encrypt(pk, msg[:], r[:])
+	c, err := k.Encrypt(pk, msg[:], r[:])
+	if err != nil {
+		t.Fatal("Seed in keygen failed")
+	}
+	c2, err := k.Encrypt(pk, msg[:], r[:])
+	if err != nil {
+		t.Fatal("Seed in keygen failed")
+	}
 	if !bytes.Equal(c, c2) {
 		t.Fatalf("Seed in keygen failed")
 	}
@@ -51,12 +57,18 @@ func testEncryptRep(t *testing.T, k *Kyber) {
 	var r, msg [32]byte
 	rand.Read(r[:])
 	rand.Read(msg[:])
-	c := k.Encrypt(pk, msg[:], r[:])
-	c2 := k.Encrypt(pk, msg[:], r[:])
+	c, err := k.Encrypt(pk, msg[:], r[:])
+	if err != nil {
+		t.Fatal("Coins failed")
+	}
+	c2, err := k.Encrypt(pk, msg[:], r[:])
+	if err != nil {
+		t.Fatal("Coins failed")
+	}
 	if !bytes.Equal(c, c2) {
 		t.Fatalf("Coins failed")
 	}
-	c3 := k.Encrypt(pk, msg[:], nil)
+	c3, err := k.Encrypt(pk, msg[:], nil)
 	if bytes.Equal(c, c3) {
 		t.Fatalf("Coins failed")
 	}
@@ -67,8 +79,14 @@ func testDecrypt(t *testing.T, k *Kyber) {
 	var r, msg [32]byte
 	rand.Read(r[:])
 	rand.Read(msg[:])
-	c := k.Encrypt(pk, msg[:], r[:])
-	msgRecov := k.Decrypt(sk, c)
+	c, err := k.Encrypt(pk, msg[:], r[:])
+	if err != nil {
+		t.Fatal("Failed to decrypt")
+	}
+	msgRecov, err := k.Decrypt(sk, c)
+	if err != nil {
+		t.Fatal("Failed to decrypt")
+	}
 	if !bytes.Equal(msg[:], msgRecov[:]) {
 		t.Fatal("Failed to decrypt")
 	}
@@ -76,8 +94,16 @@ func testDecrypt(t *testing.T, k *Kyber) {
 
 func testPack(t *testing.T, k *Kyber) {
 	pk, sk := k.PKEKeyGen(nil)
-	pk2 := k.PackPK(k.UnpackPK(pk))
-	sk2 := k.PackPKESK(k.UnpackPKESK(sk))
+	pkUnpacked, err := k.UnpackPK(pk)
+	if err != nil {
+		t.Fatal("Unpack failed")
+	}
+	skUnpacked, err := k.UnpackSK(sk)
+	if err != nil {
+		t.Fatal("SK Unpack failed")
+	}
+	pk2 := k.PackPK(pkUnpacked)
+	sk2 := k.PackSK(skUnpacked)
 	if !bytes.Equal(pk[:], pk2[:]) {
 		t.Fatal("Pack failed")
 	}
@@ -88,19 +114,19 @@ func testPack(t *testing.T, k *Kyber) {
 
 func testBadSizePKE(t *testing.T, k *Kyber) {
 	msg := make([]byte, 50)
-	c := k.Encrypt(nil, msg, nil)
-	if c != nil {
+	c, err := k.Encrypt(nil, msg, nil)
+	if c != nil || err != nil {
 		t.Fatal("Encrypt should not work with empty key.")
 	}
 
-	c = k.Encrypt(nil, []byte("Short message"), nil)
+	c, err = k.Encrypt(nil, []byte("Short message"), nil)
 
-	if c != nil {
+	if c != nil || err != nil {
 		t.Fatal("Encrypt should not work with empty inputs.")
 	}
 
-	ss := k.Decrypt(nil, nil)
-	if ss != nil {
+	ss, err := k.Decrypt(nil, nil)
+	if ss != nil || err != nil {
 		t.Fatal("Decrypt should not work with short message.")
 	}
 }

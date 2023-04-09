@@ -2,17 +2,21 @@ package kyber
 
 import (
 	"crypto/rand"
+	"errors"
 
 	"golang.org/x/crypto/sha3"
 )
 
-//PKEKeyGen creates a public and private key pair.
-//A 32 byte long seed can be given as argument. If a nil seed is given, the seed is generated using Go crypto's random number generator.
-//The keys returned are packed into byte arrays.
+// PKEKeyGen creates a public and private key pair.
+// A 32 byte long seed can be given as argument. If a nil seed is given, the seed is generated using Go crypto's random number generator.
+// The keys returned are packed into byte arrays.
 func (k *Kyber) PKEKeyGen(seed []byte) ([]byte, []byte) {
 	if seed == nil || len(seed) != SEEDBYTES {
 		seed = make([]byte, SEEDBYTES)
-		rand.Read(seed)
+		_, err := rand.Read(seed)
+		if err != nil {
+			return nil, nil
+		}
 	}
 
 	K := k.params.K
@@ -51,29 +55,33 @@ func (k *Kyber) PKEKeyGen(seed []byte) ([]byte, []byte) {
 	return k.PackPK(&PublicKey{T: t, Rho: rho[:]}), k.PackPKESK(&PKEPrivateKey{S: shat})
 }
 
-//Encrypt generates the encryption of a message using a public key.
-//A 32 byte long seed can be given as argument (r). If a nil seed is given, the seed is generated using Go crypto's random number generator.
-//The ciphertext returned is packed into a byte array.
-//If an error occurs during the encrpytion process, a nil array is returned.
-func (k *Kyber) Encrypt(packedPK, msg, r []byte) []byte {
+// Encrypt generates the encryption of a message using a public key.
+// A 32 byte long seed can be given as argument (r). If a nil seed is given, the seed is generated using Go crypto's random number generator.
+// The ciphertext returned is packed into a byte array.
+// If an error occurs during the encryption process, a nil array is returned.
+func (k *Kyber) Encrypt(packedPK, msg, r []byte) ([]byte, error) {
 
 	if len(msg) < n/8 {
-		println("Message is too short to be encrypted.")
-		return nil
+		return nil, errors.New("message is too short to be encrypted")
 	}
 
 	if len(packedPK) != k.SIZEPK() {
-		println("Cannot encrypt with this public key.")
-		return nil
+		return nil, errors.New("cannot encrypt with the public key")
 	}
 
 	if len(r) != SEEDBYTES {
 		r = make([]byte, SEEDBYTES)
-		rand.Read(r[:])
+		_, err := rand.Read(r[:])
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	K := k.params.K
-	pk := k.UnpackPK(packedPK)
+	pk, err := k.UnpackPK(packedPK)
+	if err != nil {
+		return nil, err
+	}
 	Ahat := expandSeed(pk.Rho[:], true, K)
 
 	sp := make(Vec, K)
@@ -95,7 +103,7 @@ func (k *Kyber) Encrypt(packedPK, msg, r []byte) []byte {
 		u[i] = vecPointWise(Ahat[i], sp, K)
 		u[i].toMont()
 		u[i] = add(u[i], ep[i])
-		u[i].invntt()
+		u[i].invNTT()
 		u[i].reduce()
 		u[i].fromMont()
 	}
@@ -107,26 +115,28 @@ func (k *Kyber) Encrypt(packedPK, msg, r []byte) []byte {
 	v.toMont()
 	v = add(v, epp)
 	v = add(v, m)
-	v.invntt()
+	v.invNTT()
 	v.reduce()
 	v.fromMont()
 
 	c := make([]byte, k.params.SIZEC)
 	copy(c[:], u.compress(k.params.DU, K))
 	copy(c[K*k.params.DU*n/8:], v.compress(k.params.DV))
-	return c[:]
+	return c[:], nil
 }
 
-//Decrypt decrypts a ciphertext given a secret key.
-//The secret key and ciphertext must be give as packed byte array.
-//The recovered message is returned as byte array.
-//If an error occurs durirng the decryption process (wrong key format for example), a nil message is returned.
-func (k *Kyber) Decrypt(packedSK, c []byte) []byte {
+// Decrypt decrypts a ciphertext given a secret key.
+// The secret key and ciphertext must be give as packed byte array.
+// The recovered message is returned as byte array.
+// If an error occurs during the decryption process (wrong key format for example), a nil message is returned.
+func (k *Kyber) Decrypt(packedSK, c []byte) ([]byte, error) {
 	if len(c) != k.SIZEC() || len(packedSK) != k.SIZEPKESK() {
-		println("Cannot decrypt, inputs do not have correct size.")
-		return nil
+		return nil, errors.New("cannot decrypt, inputs do not have correct size")
 	}
-	sk := k.UnpackPKESK(packedSK)
+	sk, err := k.UnpackPKESK(packedSK)
+	if err != nil {
+
+	}
 	K := k.params.K
 	uhat := decompressVec(c[:K*k.params.DU*n/8], k.params.DU, K)
 	uhat.ntt(K)
@@ -136,9 +146,9 @@ func (k *Kyber) Decrypt(packedSK, c []byte) []byte {
 	m := vecPointWise(sk.S, uhat, K)
 	m.toMont()
 	m = sub(v, m)
-	m.invntt()
+	m.invNTT()
 	m.reduce()
 	m.fromMont()
 
-	return polyToMsg(m)
+	return polyToMsg(m), nil
 }
